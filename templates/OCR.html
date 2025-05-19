@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image to Text (OCR)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            text-align: center;
+        }
+        form {
+            margin-bottom: 20px;
+            display: inline-block;
+            text-align: left;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input[type="file"] {
+            margin-bottom: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        #result {
+            margin-top: 20px;
+            text-align: center;
+        }
+        p {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Image to Text (OCR)</h1>
+    <form id="imageForm" enctype="multipart/form-data">
+        <label for="image">Upload Image (PNG, JPG, JPEG):</label>
+        <input type="file" id="image" name="image" accept="image/png, image/jpeg" required>
+        <br>
+        <button type="submit">Process Image</button>
+    </form>
+
+    <div id="result">
+        <h2>OCR Result:</h2>
+        <p id="ocrText"></p>
+        <p id="generationTime"></p>
+        <p id="errorMessage" style="color: red;"></p>
+    </div>
+
+    <script>
+        const form = document.getElementById('imageForm');
+        const ocrText = document.getElementById('ocrText');
+        const generationTimeDisplay = document.getElementById('generationTime');
+        const errorMessage = document.getElementById('errorMessage');
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const formData = new FormData(form);
+            ocrText.textContent = 'Loading...';
+            generationTimeDisplay.textContent = '';
+            errorMessage.textContent = '';
+
+            try {
+                const response = await fetch('/process-image', {  // Ensure this matches your Flask route
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    errorMessage.textContent = errorData.error || 'Failed to process image.';
+                    ocrText.textContent = '';
+                    return;
+                }
+
+                const data = await response.json();
+                ocrText.textContent = data.response;
+                generationTimeDisplay.textContent = `Generation Time: ${data.generation_time.toFixed(3)} seconds`;
+            } catch (error) {
+                errorMessage.textContent = 'An unexpected error occurred.';
+                ocrText.textContent = '';
+                generationTimeDisplay.textContent = '';
+                console.error(error);
+            }
+        });
+    </script>
+</body>
+</html>
