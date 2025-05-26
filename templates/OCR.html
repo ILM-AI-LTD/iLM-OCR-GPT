@@ -22,12 +22,31 @@
         input[type="file"] {
             margin-bottom: 10px;
         }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
         button {
             padding: 10px 20px;
             background-color: #4CAF50;
             color: white;
             border: none;
             cursor: pointer;
+            border-radius: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .camera-button {
+            background-color: #2196F3;
+        }
+        .camera-button:hover {
+            background-color: #1976D2;
         }
         #result {
             margin-top: 20px;
@@ -36,15 +55,40 @@
         p {
             margin: 5px 0;
         }
+        .preview-container {
+            margin: 10px 0;
+            text-align: center;
+        }
+        .preview-image {
+            max-width: 300px;
+            max-height: 300px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
     <h1>Image to Text (OCR)</h1>
     <form id="imageForm" enctype="multipart/form-data">
-        <label for="image">Upload Image (PNG, JPG, JPEG):</label>
-        <input type="file" id="image" name="image" accept="image/png, image/jpeg" required>
+        <label for="image">Upload Image or Take Photo:</label>
+        
+        <div class="button-group">
+            <button type="button" id="selectImageButton">Select Image</button>
+        </div>
+        
+        <input type="file" id="image" name="image" accept="image/*" capture="environment" style="display: none;">
+        
+        <div class="preview-container">
+            <img id="imagePreview" class="preview-image" style="display: none;" alt="Preview">
+            <p id="fileName" style="display: none;"></p>
+        </div>
+        
         <br>
-        <button type="submit">Process Image</button>
+        <button type="submit" id="processButton" disabled>Process Image</button>
     </form>
 
     <div id="result">
@@ -56,20 +100,58 @@
 
     <script>
         const form = document.getElementById('imageForm');
+        const imageInput = document.getElementById('image');
+        const selectImageButton = document.getElementById('selectImageButton');
+        const processButton = document.getElementById('processButton');
+        const imagePreview = document.getElementById('imagePreview');
+        const fileName = document.getElementById('fileName');
         const ocrText = document.getElementById('ocrText');
         const generationTimeDisplay = document.getElementById('generationTime');
         const errorMessage = document.getElementById('errorMessage');
 
+        // Select image button click
+        selectImageButton.addEventListener('click', () => {
+            imageInput.click();
+        });
+
+        // Handle file selection
+        imageInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                // Show preview
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    imagePreview.src = e.target.result;
+                    imagePreview.style.display = 'block';
+                    fileName.textContent = `Selected: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+                    fileName.style.display = 'block';
+                    processButton.disabled = false;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Form submission
         form.addEventListener('submit', async (event) => {
             event.preventDefault();
 
-            const formData = new FormData(form);
-            ocrText.textContent = 'Loading...';
+            const file = imageInput.files[0];
+            if (!file) {
+                errorMessage.textContent = 'Please select an image first.';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('image', file);
+
+            ocrText.textContent = 'Processing...';
+            ocrText.className = 'loading';
             generationTimeDisplay.textContent = '';
             errorMessage.textContent = '';
+            processButton.disabled = true;
 
             try {
-                const response = await fetch('/process-image', {  // Ensure this matches your Flask route
+                const response = await fetch('/process-image', {
                     method: 'POST',
                     body: formData,
                 });
@@ -78,17 +160,22 @@
                     const errorData = await response.json();
                     errorMessage.textContent = errorData.error || 'Failed to process image.';
                     ocrText.textContent = '';
+                    ocrText.className = '';
                     return;
                 }
 
                 const data = await response.json();
                 ocrText.textContent = data.response;
+                ocrText.className = '';
                 generationTimeDisplay.textContent = `Generation Time: ${data.generation_time.toFixed(3)} seconds`;
             } catch (error) {
                 errorMessage.textContent = 'An unexpected error occurred.';
                 ocrText.textContent = '';
+                ocrText.className = '';
                 generationTimeDisplay.textContent = '';
                 console.error(error);
+            } finally {
+                processButton.disabled = false;
             }
         });
     </script>
