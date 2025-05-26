@@ -5,15 +5,23 @@ import os
 import base64
 import time
 
+# Load environment variables from .env file
 load_dotenv()
 
 app = Flask(__name__)
-client = OpenAI()
+
+# Explicitly get the API key from environment variables
+api_key = os.getenv('OPENAI_API_KEY')
+if not api_key:
+    raise ValueError("OPENAI_API_KEY not found in environment variables. Please check your .env file.")
+
+# Initialize OpenAI client with the API key
+client = OpenAI(api_key=api_key)
 
 @app.route('/')
 def index():
     """
-    This route renders the main HTML form.  Place OCR.html in a folder named "templates".
+    This route renders the main HTML form. Place OCR.html in a folder named "templates".
     """
     return render_template('OCR.html')
 
@@ -29,16 +37,21 @@ def process_image():
     print("Image type: ", type(image_file))
     image_bytes = image_file.read()
     base64_image = base64.b64encode(image_bytes).decode("utf-8")
-    # print("image:", base64_image)
+    
+    # Get the actual image format
+    image_format = image_file.content_type or "image/jpeg"
+    print(f"Image format: {image_format}")
 
     input_messages = [
         {
             "role": "user",
             "content": [
-                {"type": "input_text", "text": "OCR it."},
+                {"type": "text", "text": "OCR it."},
                 {
-                    "type": "input_image",
-                    "image_url": f"data:image/jpeg;base64,{base64_image}",
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{image_format};base64,{base64_image}"
+                    }
                 },
             ],
         }
@@ -46,16 +59,19 @@ def process_image():
 
     try:
         st = time.time()
-        response = client.responses.create(model="gpt-4o-mini", input=input_messages)
-        # print(response.output_text)
+        response = client.chat.completions.create(
+            model="gpt-4o-mini", 
+            messages=input_messages
+        )
         en = time.time()
 
         return jsonify({
-            "response": response.output_text,
+            "response": response.choices[0].message.content,
             "generation_time": en - st
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
